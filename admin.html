@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulim Admin</title>
+<style>
+  :root { --bg:#0a0a18; --surface:#12122a; --border:#1e1e45; --text:#e8e8f0; --hint:#7a7a99; --green:#00d4a1; --red:#ff5c72; --blue:#38bdf8; --yellow:#fbbf24; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .header h1 { font-size:22px; font-weight:800; }
+  .header h1 span { color:var(--green); }
+  .badge { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .badge-green { background:rgba(0,212,161,0.15); color:var(--green); }
+
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; padding:20px 24px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; }
+  .stat-num { font-size:28px; font-weight:800; margin-bottom:4px; }
+  .stat-label { font-size:12px; color:var(--hint); }
+
+  .section { padding:0 24px 24px; }
+  .section-title { font-size:14px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:14px; padding-top:20px; }
+
+  .user-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:16px; margin-bottom:10px; display:flex; align-items:center; gap:14px;
+    transition: border-color 0.2s;
+  }
+  .user-card:hover { border-color:#333366; }
+  .user-avatar {
+    width:44px; height:44px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:800; flex-shrink:0;
+  }
+  .user-info { flex:1; min-width:0; }
+  .user-name { font-size:15px; font-weight:700; }
+  .user-meta { font-size:12px; color:var(--hint); margin-top:2px; }
+  .user-stats { font-size:12px; color:var(--hint); margin-top:4px; }
+
+  .user-actions { display:flex; gap:6px; flex-shrink:0; }
+  .btn {
+    padding:8px 14px; border:none; border-radius:8px; font-size:12px; font-weight:700;
+    cursor:pointer; transition:all 0.2s; font-family:inherit;
+  }
+  .btn-approve { background:rgba(0,212,161,0.15); color:var(--green); }
+  .btn-approve:hover { background:rgba(0,212,161,0.3); }
+  .btn-block { background:rgba(255,92,114,0.15); color:var(--red); }
+  .btn-block:hover { background:rgba(255,92,114,0.3); }
+  .btn-revoke { background:rgba(251,191,36,0.15); color:var(--yellow); }
+  .btn-revoke:hover { background:rgba(251,191,36,0.3); }
+
+  .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .status-approved { background:var(--green); }
+  .status-pending { background:var(--yellow); }
+  .status-blocked { background:var(--red); }
+
+  .filter-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .filter-btn {
+    padding:6px 14px; border-radius:8px; border:1px solid var(--border);
+    background:transparent; color:var(--hint); font-size:12px; font-weight:600;
+    cursor:pointer; font-family:inherit; transition:all 0.2s;
+  }
+  .filter-btn.active { background:var(--green); color:#000; border-color:var(--green); }
+
+  .empty { text-align:center; padding:40px; color:var(--hint); font-size:14px; }
+  .toast {
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(60px);
+    background:var(--surface); border:1px solid var(--green); padding:12px 24px;
+    border-radius:12px; font-size:14px; font-weight:600; transition:transform 0.3s; z-index:99;
+  }
+  .toast.visible { transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>👑 <span>Pulim</span> Admin</h1>
+  <div class="badge badge-green" id="statusBadge">Loading...</div>
+</div>
+
+<div class="stats-grid" id="statsGrid"></div>
+
+<div class="section">
+  <div class="section-title">Users</div>
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterUsers('all',this)">All</button>
+    <button class="filter-btn" onclick="filterUsers('approved',this)">Approved</button>
+    <button class="filter-btn" onclick="filterUsers('pending',this)">Pending</button>
+    <button class="filter-btn" onclick="filterUsers('blocked',this)">Blocked</button>
+  </div>
+  <div id="userList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get('token') || '';
+const API = location.origin;
+let allUsers = [];
+let currentFilter = 'all';
+
+const fmt = n => new Intl.NumberFormat('ru-RU').format(Math.round(n));
+
+async function api(path, opts) {
+  const sep = path.includes('?') ? '&' : '?';
+  const url = API + path + sep + 'token=' + TOKEN;
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+async function load() {
+  try {
+    allUsers = await api('/api/admin/users');
+    renderStats();
+    renderUsers();
+    document.getElementById('statusBadge').textContent = `${allUsers.length} users`;
+  } catch(e) {
+    document.getElementById('userList').innerHTML = '<div class="empty">Auth error</div>';
+  }
+}
+
+function renderStats() {
+  const approved = allUsers.filter(u=>u.is_approved).length;
+  const pending = allUsers.filter(u=>!u.is_approved && !u.is_blocked).length;
+  const blocked = allUsers.filter(u=>u.is_blocked).length;
+  const totalTx = allUsers.reduce((s,u)=>s+u.tx_count, 0);
+  const totalExp = allUsers.reduce((s,u)=>s+u.total_expense, 0);
+  const totalInc = allUsers.reduce((s,u)=>s+u.total_income, 0);
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${allUsers.length}</div><div class="stat-label">All users</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${approved}</div><div class="stat-label">Approved</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--yellow)">${pending}</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--red)">${blocked}</div><div class="stat-label">Blocked</div></div>
+    <div class="stat-card"><div class="stat-num">${totalTx}</div><div class="stat-label">Transactions</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${fmt(totalInc)}</div><div class="stat-label">Total income</div></div>
+  `;
+}
+
+function renderUsers() {
+  let users = allUsers;
+  if(currentFilter==='approved') users = users.filter(u=>u.is_approved && !u.is_blocked);
+  else if(currentFilter==='pending') users = users.filter(u=>!u.is_approved && !u.is_blocked);
+  else if(currentFilter==='blocked') users = users.filter(u=>u.is_blocked);
+
+  if(users.length === 0) {
+    document.getElementById('userList').innerHTML = '<div class="empty">No users in this category</div>';
+    return;
+  }
+
+  document.getElementById('userList').innerHTML = users.map(u => {
+    let status, statusClass;
+    if(u.is_blocked) { status='Blocked'; statusClass='status-blocked'; }
+    else if(u.is_approved) { status='Approved'; statusClass='status-approved'; }
+    else { status='Pending'; statusClass='status-pending'; }
+
+    const initials = (u.first_name||'?')[0].toUpperCase();
+    const bgColor = u.is_admin ? 'linear-gradient(135deg,var(--green),#8b5cf6)' :
+                    u.is_approved ? 'rgba(0,212,161,0.2)' :
+                    u.is_blocked ? 'rgba(255,92,114,0.2)' : 'rgba(251,191,36,0.2)';
+
+    let actions = '';
+    if(!u.is_admin) {
+      if(!u.is_approved && !u.is_blocked) {
+        actions = `<button class="btn btn-approve" onclick="doAction(${u.telegram_id},'approve')">Approve</button>
+                   <button class="btn btn-block" onclick="doAction(${u.telegram_id},'block')">Block</button>`;
+      } else if(u.is_approved) {
+        actions = `<button class="btn btn-revoke" onclick="doAction(${u.telegram_id},'revoke')">Revoke</button>
+                   <button class="btn btn-block" onclick="doAction(${u.telegram_id},'block')">Block</button>`;
+      } else {
+        actions = `<button class="btn btn-approve" onclick="doAction(${u.telegram_id},'approve')">Approve</button>`;
+      }
+    }
+
+    return `<div class="user-card">
+      <div class="user-avatar" style="background:${bgColor}">${u.is_admin?'👑':initials}</div>
+      <div class="user-info">
+        <div class="user-name">${u.first_name||'?'} ${u.is_admin?'<span style="color:var(--green);font-size:11px">ADMIN</span>':''}</div>
+        <div class="user-meta"><span class="status-dot ${statusClass}"></span>${status} · @${u.username||'no_username'} · ID: ${u.telegram_id}</div>
+        <div class="user-stats">${u.tx_count} ops · Income: ${fmt(u.total_income)} · Expense: ${fmt(u.total_expense)}</div>
+      </div>
+      <div class="user-actions">${actions}</div>
+    </div>`;
+  }).join('');
+}
+
+function filterUsers(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderUsers();
+}
+
+async function doAction(uid, action) {
+  await api('/api/admin/action', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({user_id:uid, action})
+  });
+  showToast(`${action === 'approve' ? '✅ Approved' : action === 'block' ? '🚫 Blocked' : '⚠️ Revoked'}`);
+  await load();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('visible');
+  setTimeout(()=>t.classList.remove('visible'), 2000);
+}
+
+load();
+</script>
+</body>
+</html>

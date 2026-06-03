@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Pulim</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root,[data-theme="dark"]{--bg:#0a0a18;--surface:#12122a;--surface2:#1a1a3a;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#8888aa;--text3:#555570;--green:#00d4a1;--red:#ff5c72;--card-grad:linear-gradient(145deg,rgba(0,212,161,0.06),rgba(139,92,246,0.03));--shadow:0 2px 12px rgba(0,0,0,0.3)}
+[data-theme="light"]{--bg:#f4f5f7;--surface:#fff;--surface2:#eef0f4;--border:rgba(0,0,0,0.08);--text:#1a1a2e;--text2:#666680;--text3:#999;--green:#00b88d;--red:#e5364b;--card-grad:linear-gradient(145deg,rgba(0,184,141,0.06),rgba(124,77,255,0.03));--shadow:0 2px 12px rgba(0,0,0,0.06)}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,'SF Pro Display','Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:14px}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+.loader-text{color:var(--text2);font-size:13px}
+.header{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:20;gap:10px}
+.header-logo{font-size:18px;font-weight:800;color:var(--green);flex:1}
+.wallet-select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;font-family:inherit;cursor:pointer;max-width:130px}
+.theme-btn{width:32px;height:32px;border:none;background:var(--surface);border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.tabs{display:flex;padding:6px 16px;gap:4px;border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:9px 0;border:none;background:none;color:var(--text3);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;transition:.2s}
+.tab.active{background:var(--surface);color:var(--text)}
+.screen{display:none;padding:14px 16px;padding-bottom:20px}
+.screen.active{display:block;animation:fadeUp .3s ease}
+.section{margin-bottom:22px}
+.section-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.balance-card{padding:22px 18px;border-radius:18px;background:var(--card-grad);border:1px solid var(--border);margin-bottom:18px;box-shadow:var(--shadow)}
+.balance-label{font-size:12px;color:var(--text2);margin-bottom:2px}
+.balance-amount{font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:14px}
+.balance-row{display:flex;gap:20px}
+.stat{display:flex;align-items:center;gap:5px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.stat-l{font-size:11px;color:var(--text2)}
+.stat-v{font-size:13px;font-weight:700}
+.cat-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.cat-scroll::-webkit-scrollbar{display:none}
+.cat-pill{flex-shrink:0;padding:10px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);text-align:center;min-width:85px}
+.cat-pill .ci{font-size:20px;margin-bottom:3px}
+.cat-pill .cn{font-size:10px;color:var(--text2);margin-bottom:2px}
+.cat-pill .ca{font-size:12px;font-weight:700}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 10px;box-shadow:var(--shadow)}
+.tx{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid var(--border)}
+.tx:last-child{border:none}
+.tx-ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.tx-nfo{flex:1;min-width:0}
+.tx-d{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-m{font-size:11px;color:var(--text3);margin-top:1px}
+.tx-a{font-size:13px;font-weight:700;white-space:nowrap;text-align:right}
+.tx-sub{font-size:10px;color:var(--text3)}
+.legend-item{display:flex;align-items:center;gap:9px;padding:7px 0}
+.ldot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.lname{flex:1;font-size:12px;color:var(--text2)}
+.lpct{font-size:12px;font-weight:700}
+.progress-row{padding:10px 0;border-bottom:1px solid var(--border)}
+.progress-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.progress-nm{flex:1;font-size:12px}
+.progress-vl{font-size:12px;font-weight:700}
+.progress-bg{height:5px;border-radius:3px;background:var(--border);overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .6s}
+.period-bar{display:flex;gap:6px;margin-bottom:14px}
+.pbtn{padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text3);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s}
+.pbtn.active{background:var(--green);color:#000;border-color:var(--green)}
+.lang-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.lang-btn{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s}
+.lang-btn.active{background:var(--green);color:#000;border-color:var(--green)}
+.s-row{display:flex;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);gap:12px}
+.s-icon{font-size:18px;width:22px;text-align:center}
+.s-label{flex:1;font-size:14px;font-weight:500}
+.s-value{font-size:12px;color:var(--text3)}
+.empty{text-align:center;padding:36px 20px;color:var(--text2)}
+.empty-ic{font-size:40px;margin-bottom:10px}
+.empty-t{font-size:14px;line-height:1.5}
+</style>
+</head>
+<body data-theme="dark">
+<div id="loader" class="loader"><div class="spinner"></div><div class="loader-text">Pulim</div></div>
+<div id="app" style="display:none">
+<div class="header"><div class="header-logo">💰 Pulim</div><select class="wallet-select" id="walletSelect" onchange="switchWallet(this.value)"></select><button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button></div>
+<div class="tabs">
+<button class="tab active" data-t="home" onclick="go(this)">🏠 <span data-i18n="tab_home"></span></button>
+<button class="tab" data-t="analytics" onclick="go(this)">📊 <span data-i18n="tab_analytics"></span></button>
+<button class="tab" data-t="history" onclick="go(this)">📋 <span data-i18n="tab_history"></span></button>
+<button class="tab" data-t="settings" onclick="go(this)">⚙️ <span data-i18n="tab_settings"></span></button>
+</div>
+<div class="screen active" id="sHome">
+<div class="balance-card"><div class="balance-label" data-i18n="balance_month"></div><div class="balance-amount" id="balAmt">0</div>
+<div class="balance-row"><div class="stat"><div class="dot" style="background:var(--green)"></div><span class="stat-l" data-i18n="income"></span><span class="stat-v" style="color:var(--green)" id="incVal">+0</span></div>
+<div class="stat"><div class="dot" style="background:var(--red)"></div><span class="stat-l" data-i18n="expense"></span><span class="stat-v" style="color:var(--red)" id="expVal">-0</span></div></div></div>
+<div class="section"><div class="section-title" data-i18n="categories"></div><div class="cat-scroll" id="catScroll"></div></div>
+<div class="section"><div class="section-title" data-i18n="chart_title"></div><div class="chart-card"><canvas id="barChart" height="150"></canvas></div></div>
+<div class="section"><div class="section-title" data-i18n="recent"></div><div id="recentTx"></div></div>
+</div>
+<div class="screen" id="sAnalytics">
+<div class="section"><div class="section-title" data-i18n="expense_structure"></div><div class="chart-card"><canvas id="pieChart" height="200"></canvas><div id="pieLegend" style="padding:10px 6px 0"></div></div></div>
+<div class="section"><div class="section-title" data-i18n="top_expenses"></div><div id="topList"></div></div>
+</div>
+<div class="screen" id="sHistory">
+<div class="period-bar">
+<button class="pbtn active" onclick="loadH('month',this)" data-i18n="month"></button>
+<button class="pbtn" onclick="loadH('week',this)" data-i18n="week"></button>
+<button class="pbtn" onclick="loadH('today',this)" data-i18n="today"></button>
+<button class="pbtn" onclick="loadH('all',this)" data-i18n="all_time"></button>
+</div><div id="histList"></div>
+</div>
+<div class="screen" id="sSettings">
+<div class="section"><div class="section-title" data-i18n="language"></div>
+<div class="lang-btns"><button class="lang-btn" onclick="setLang('ru')">🇷🇺 Русский</button><button class="lang-btn" onclick="setLang('en')">🇬🇧 English</button><button class="lang-btn" onclick="setLang('uz')">🇺🇿 O'zbek</button></div></div>
+<div class="section" style="margin-top:24px"><div class="section-title" data-i18n="appearance"></div>
+<div class="lang-btns"><button class="lang-btn" id="tDark" onclick="setTheme('dark')">🌙 Dark</button><button class="lang-btn" id="tLight" onclick="setTheme('light')">☀️ Light</button><button class="lang-btn" id="tAuto" onclick="setTheme('auto')">📱 Auto</button></div></div>
+<div class="section" style="margin-top:24px"><div class="section-title" data-i18n="info"></div>
+<div class="s-row"><span class="s-icon">💱</span><span class="s-label" data-i18n="currency"></span><span class="s-value">UZS</span></div>
+<div class="s-row"><span class="s-icon">📊</span><span class="s-label" data-i18n="transactions"></span><span class="s-value" id="txCount">0</span></div>
+<div class="s-row"><span class="s-icon">👛</span><span class="s-label" data-i18n="wallets"></span><span class="s-value" id="wCount">0</span></div>
+<div class="s-row"><span class="s-icon">📱</span><span class="s-label">Version</span><span class="s-value">3.0</span></div>
+</div></div></div>
+<script>
+const API=location.origin+'/api',tg=window.Telegram?.WebApp;
+let userId=0,activeWallet=null,allWallets=[],lang='ru',theme='dark';
+const CATS={food:{i:"🍽",c:"#FF6B6B"},transport:{i:"🚕",c:"#4ECDC4"},housing:{i:"🏠",c:"#38bdf8"},entertainment:{i:"🎮",c:"#96CEB4"},health:{i:"💊",c:"#fbbf24"},clothing:{i:"👕",c:"#DDA0DD"},education:{i:"📚",c:"#74B9FF"},transfers:{i:"💸",c:"#A29BFE"},shopping:{i:"🛒",c:"#FF9FF3"},subscriptions:{i:"📱",c:"#54A0FF"},credit:{i:"💳",c:"#EE5A24"},communication:{i:"📞",c:"#78E08F"},beauty:{i:"💇",c:"#F8A5C2"},other_expense:{i:"📦",c:"#B2BEC3"},salary:{i:"💰",c:"#00d4a1"},freelance:{i:"💻",c:"#8b5cf6"},business:{i:"🏢",c:"#6C5CE7"},other_income:{i:"📥",c:"#55EFC4"}};
+const I={
+ru:{tab_home:"Главная",tab_analytics:"Аналитика",tab_history:"История",tab_settings:"Настройки",balance_month:"Баланс за месяц",income:"Доход",expense:"Расход",categories:"Категории",chart_title:"Доходы vs Расходы",recent:"Последние операции",expense_structure:"Структура расходов",top_expenses:"Топ расходов",month:"Месяц",week:"Неделя",today:"Сегодня",all_time:"Все",language:"Язык",appearance:"Оформление",info:"Информация",currency:"Валюта",transactions:"Операций",wallets:"Кошельки",no_data:"Нет данных",no_tx:"Пока нет операций",write_first:"Напишите боту расход!",food:"Еда",transport:"Транспорт",housing:"Жильё",entertainment:"Развлечения",health:"Здоровье",clothing:"Одежда",education:"Образование",transfers:"Переводы",shopping:"Покупки",subscriptions:"Подписки",credit:"Кредит",communication:"Связь",beauty:"Красота",other_expense:"Прочее",salary:"Зарплата",freelance:"Фриланс",business:"Бизнес",other_income:"Другой доход"},
+en:{tab_home:"Home",tab_analytics:"Analytics",tab_history:"History",tab_settings:"Settings",balance_month:"Balance this month",income:"Income",expense:"Expense",categories:"Categories",chart_title:"Income vs Expense",recent:"Recent",expense_structure:"Expense structure",top_expenses:"Top expenses",month:"Month",week:"Week",today:"Today",all_time:"All",language:"Language",appearance:"Appearance",info:"Info",currency:"Currency",transactions:"Transactions",wallets:"Wallets",no_data:"No data",no_tx:"No transactions yet",write_first:"Send your first expense to the bot!",food:"Food",transport:"Transport",housing:"Housing",entertainment:"Entertainment",health:"Health",clothing:"Clothing",education:"Education",transfers:"Transfers",shopping:"Shopping",subscriptions:"Subscriptions",credit:"Credit",communication:"Communication",beauty:"Beauty",other_expense:"Other",salary:"Salary",freelance:"Freelance",business:"Business",other_income:"Other income"},
+uz:{tab_home:"Asosiy",tab_analytics:"Tahlil",tab_history:"Tarix",tab_settings:"Sozlamalar",balance_month:"Oylik balans",income:"Daromad",expense:"Xarajat",categories:"Turkumlar",chart_title:"Daromad vs Xarajat",recent:"Oxirgi amallar",expense_structure:"Xarajat tuzilmasi",top_expenses:"Top xarajatlar",month:"Oy",week:"Hafta",today:"Bugun",all_time:"Hammasi",language:"Til",appearance:"Ko'rinish",info:"Ma'lumot",currency:"Valyuta",transactions:"Amallar",wallets:"Hamyonlar",no_data:"Ma'lumot yo'q",no_tx:"Hali amallar yo'q",write_first:"Botga xarajat yozing!",food:"Ovqat",transport:"Transport",housing:"Uy-joy",entertainment:"Ko'ngilochar",health:"Salomatlik",clothing:"Kiyim",education:"Ta'lim",transfers:"O'tkazmalar",shopping:"Xaridlar",subscriptions:"Obunalar",credit:"Kredit",communication:"Aloqa",beauty:"Go'zallik",other_expense:"Boshqa",salary:"Maosh",freelance:"Frilanser",business:"Biznes",other_income:"Boshqa daromad"}
+};
+function t(k){return(I[lang]||I.en)[k]||k}
+function applyI18n(){document.querySelectorAll('[data-i18n]').forEach(e=>{e.textContent=t(e.dataset.i18n)});
+document.querySelectorAll('.lang-btn').forEach(b=>{const m=b.textContent.trim();if(m.includes('Русский'))b.classList.toggle('active',lang==='ru');else if(m.includes('English'))b.classList.toggle('active',lang==='en');else if(m.includes("O'zbek"))b.classList.toggle('active',lang==='uz')});
+updateThemeBtns()}
+const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.abs(Math.round(n)));
+const fmtS=n=>{const a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(1)+'M';if(a>=1e3)return(n/1e3).toFixed(0)+'k';return Math.round(n)+''};
+const fmtD=d=>{const dt=new Date(d),now=new Date(),df=now-dt;if(df<864e5)return dt.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});return dt.toLocaleDateString('ru',{day:'numeric',month:'short'})};
+async function api(p){try{const r=await fetch(API+p);return r.ok?await r.json():null}catch{return null}}
+function setTheme(t2){theme=t2;if(t2==='auto'){document.body.dataset.theme=tg?.colorScheme||'dark'}else{document.body.dataset.theme=t2}
+document.getElementById('themeBtn').textContent=document.body.dataset.theme==='dark'?'🌙':'☀️';try{localStorage.setItem('pt',t2)}catch{};updateThemeBtns();reChart()}
+function toggleTheme(){setTheme(document.body.dataset.theme==='dark'?'light':'dark')}
+function updateThemeBtns(){['Dark','Light','Auto'].forEach(x=>{const b=document.getElementById('t'+x);if(b)b.classList.toggle('active',theme===x.toLowerCase())})}
+function setLang(l){lang=l;applyI18n();try{localStorage.setItem('pl',l)}catch{};loadAll()}
+function go(btn){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));btn.classList.add('active');document.getElementById({home:'sHome',analytics:'sAnalytics',history:'sHistory',settings:'sSettings'}[btn.dataset.t]).classList.add('active')}
+function renderWallets(d){allWallets=d.wallets||[];activeWallet=d.active_id;const s=document.getElementById('walletSelect');s.innerHTML=allWallets.map(w=>'<option value="'+w.id+'" '+(w.id===activeWallet?'selected':'')+'>'+w.icon+' '+w.name+'</option>').join('');document.getElementById('wCount').textContent=allWallets.length}
+function switchWallet(id){activeWallet=parseInt(id);loadAll()}
+async function loadAll(){const wq=activeWallet?'&wallet_id='+activeWallet:'';
+const[bal,stats,txs]=await Promise.all([api('/balance?user_id='+userId+'&period=month'+wq),api('/stats?user_id='+userId+wq),api('/transactions?user_id='+userId+'&limit=50'+wq)]);
+if(bal)renderBal(bal);if(stats){renderCats(stats);renderAn(stats)}if(txs){renderTx(txs,'recentTx',5);renderTx(txs,'histList',50);renderBar(txs);document.getElementById('txCount').textContent=txs.length}}
+function renderBal(b){document.getElementById('balAmt').textContent=fmt(b.balance)+' UZS';document.getElementById('incVal').textContent='+'+fmtS(b.income);document.getElementById('expVal').textContent='-'+fmtS(b.expense)}
+function renderCats(s){const el=document.getElementById('catScroll');if(!s.categories||!s.categories.length){el.innerHTML='<div style="color:var(--text3);font-size:12px;padding:6px">'+t('no_data')+'</div>';return}
+el.innerHTML=s.categories.slice(0,8).map(c=>{const cat=CATS[c.category]||{i:'📦',c:'#999'};return'<div class="cat-pill"><div class="ci">'+cat.i+'</div><div class="cn">'+t(c.category)+'</div><div class="ca" style="color:'+cat.c+'">'+fmtS(c.total)+'</div></div>'}).join('')}
+function renderTx(txs,id,lim){const el=document.getElementById(id);const items=txs.slice(0,lim);
+if(!items.length){el.innerHTML='<div class="empty"><div class="empty-ic">📝</div><div class="empty-t">'+t('no_tx')+'</div></div>';return}
+el.innerHTML=items.map(tx=>{const cat=CATS[tx.category]||{i:'📦',c:'#999'};const s=tx.type==='income'?'+':'-';const clr=tx.type==='income'?'var(--green)':'var(--red)';const cur=tx.currency||'UZS';
+let aH='<div class="tx-a" style="color:'+clr+'">'+s+fmt(tx.amount)+' '+cur+'</div>';
+if(cur!=='UZS'&&tx.amount_uzs)aH+='<div class="tx-sub">≈'+fmt(tx.amount_uzs)+' UZS</div>';
+return'<div class="tx"><div class="tx-ic" style="background:'+cat.c+'15">'+cat.i+'</div><div class="tx-nfo"><div class="tx-d">'+(tx.description||'-')+'</div><div class="tx-m">'+t(tx.category)+' · '+fmtD(tx.created_at)+'</div></div><div style="text-align:right">'+aH+'</div></div>'}).join('')}
+let barI=null,pieI=null;
+function renderBar(txs){const months={};txs.forEach(tx=>{const d=new Date(tx.created_at);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(!months[k])months[k]={inc:0,exp:0,l:d.toLocaleDateString('ru',{month:'short'})};const v=tx.amount_uzs||tx.amount;if(tx.type==='income')months[k].inc+=v;else months[k].exp+=v});
+const sorted=Object.values(months).slice(-6);if(!sorted.length)return;const ctx=document.getElementById('barChart').getContext('2d');if(barI)barI.destroy();
+barI=new Chart(ctx,{type:'bar',data:{labels:sorted.map(m=>m.l),datasets:[{label:t('income'),data:sorted.map(m=>m.inc),backgroundColor:'rgba(0,212,161,0.5)',borderColor:'#00d4a1',borderWidth:1,borderRadius:5},{label:t('expense'),data:sorted.map(m=>m.exp),backgroundColor:'rgba(255,92,114,0.5)',borderColor:'#ff5c72',borderWidth:1,borderRadius:5}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},y:{display:false}}}})}
+function renderAn(s){if(!s.categories||!s.categories.length)return;const cats=s.categories,total=cats.reduce((a,c)=>a+c.total,0);const ctx=document.getElementById('pieChart').getContext('2d');if(pieI)pieI.destroy();
+pieI=new Chart(ctx,{type:'doughnut',data:{labels:cats.map(c=>t(c.category)),datasets:[{data:cats.map(c=>c.total),backgroundColor:cats.map(c=>(CATS[c.category]||{c:'#999'}).c),borderWidth:0,spacing:3,borderRadius:4}]},options:{responsive:true,cutout:'58%',plugins:{legend:{display:false}}}});
+document.getElementById('pieLegend').innerHTML=cats.map(c=>{const ct=CATS[c.category]||{c:'#999'};const p=((c.total/total)*100).toFixed(0);return'<div class="legend-item"><div class="ldot" style="background:'+ct.c+'"></div><span class="lname">'+t(c.category)+'</span><span class="lpct">'+p+'%</span></div>'}).join('');
+document.getElementById('topList').innerHTML=cats.map(c=>{const ct=CATS[c.category]||{c:'#999'};const p=((c.total/total)*100).toFixed(0);return'<div class="progress-row"><div class="progress-hdr"><span>'+ct.i+' '+t(c.category)+'</span><span class="progress-vl">'+fmt(c.total)+'</span></div><div class="progress-bg"><div class="progress-fill" style="width:'+p+'%;background:'+ct.c+'"></div></div></div>'}).join('')}
+function reChart(){}
+async function loadH(period,btn){document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const wq=activeWallet?'&wallet_id='+activeWallet:'';const txs=await api('/transactions?user_id='+userId+'&limit=100&period='+period+wq);if(txs)renderTx(txs,'histList',100)}
+async function init(){if(tg){tg.ready();tg.expand();userId=tg.initDataUnsafe?.user?.id||0;if(tg.colorScheme)document.body.dataset.theme=tg.colorScheme}
+if(!userId)userId=new URLSearchParams(location.search).get('user_id')||0;
+try{lang=localStorage.getItem('pl')||'ru'}catch{};try{const st=localStorage.getItem('pt');if(st)theme=st}catch{};setTheme(theme);applyI18n();
+const wd=await api('/wallets?user_id='+userId);if(wd)renderWallets(wd);await loadAll();
+document.getElementById('loader').style.display='none';document.getElementById('app').style.display='block'}
+init();
+</script>
+</body></html>
